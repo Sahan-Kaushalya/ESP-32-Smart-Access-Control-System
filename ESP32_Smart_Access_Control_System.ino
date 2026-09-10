@@ -12,10 +12,10 @@
 
 // Wifi + Server Configuration
 
-const char* SSID = "SLT-Fiber-2.4G_75f0";
-const char* WIFI_PASSWORD = "sick3652";
+const char* SSID = "XXXXXXXXXXXXXXXXXXXXXXX";
+const char* WIFI_PASSWORD = "XXXXXXXXXXXXXXXXXXX";
 const char* HOST_NAME = "smartaccess";
-const char* LOGS_URL = "https://script.google.com/macros/s/AKfycbz4O50CYNT64cGtF233XQaKGGoHfAMh7XtRpuHKp69_--PngDAWWF-NSgfPE0wCbdIgeA/exec";
+const char* LOGS_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec";
 
 // Valid Login Credentials
 
