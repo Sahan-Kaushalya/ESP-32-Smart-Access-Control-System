@@ -30,6 +30,7 @@ A Wi-Fi-enabled access control system built with an ESP32. The ESP32 hosts a bro
 Connect each LED through an appropriate current-limiting resistor. Connect the LED and buzzer grounds to ESP32 GND.
 
 ![Project components](SS/ESP32ASVIDEO.mp4_snapshot_05.20_[2026.09.13_20.23.00].jpg)
+![Project components](SS/ESP32ASVIDEO.mp4_snapshot_05.45_[2026.09.13_20.23.06].jpg)
 
 ## Wiring and System Overview
 
