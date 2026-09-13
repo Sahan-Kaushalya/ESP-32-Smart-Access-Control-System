@@ -1,6 +1,7 @@
 #include <ESPmDNS.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 
 /*
   =====================================================================
@@ -12,10 +13,10 @@
 
 // Wifi + Server Configuration
 
-const char* SSID = "SLT-Fiber-2.4G_75f0";
-const char* WIFI_PASSWORD = "sick3652";
+const char* SSID = "XXXXX-XXXXX-XXXXXXX";
+const char* WIFI_PASSWORD = "XXXXXXX";
 const char* HOST_NAME = "smartaccess";
-const char* LOGS_URL = "https://script.google.com/macros/s/AKfycbz4O50CYNT64cGtF233XQaKGGoHfAMh7XtRpuHKp69_--PngDAWWF-NSgfPE0wCbdIgeA/exec";
+const char* LOGS_URL = "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXX-XXXXXXXXXXXXXXXX/exec";
 
 // Valid Login Credentials
 
@@ -43,9 +44,30 @@ uint8_t RED_LED_STATE = LOW;
 WiFiServer server(80);
 
 
-void sendLog() {
-}
+void sendLog(String ip, String status, int attempts, String message, String locked) {
+  if (WiFi.status() == WL_CONNECTED) {
+    WiFiClientSecure secureClient;
+    secureClient.setInsecure();
 
+    HTTPClient http;
+    message.replace(" ", "%20");
+
+    String url = String(LOGS_URL) + "?ip=" + ip + "&status=" + status + "&attempts=" + String(attempts) + "&message=" + message + "&locked=" + locked;
+
+    http.begin(secureClient, url);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      Serial.println("Log saved to Google Sheets. Code: " + String(httpCode));
+    } else {
+      Serial.println("Error saving log: " + http.errorToString(httpCode));
+    }
+
+    http.end();
+  }
+}
 void allRedOff() {
   digitalWrite(RED_LED_1, LOW);
   digitalWrite(RED_LED_2, LOW);
@@ -225,8 +247,9 @@ const char htmlPage[] PROGMEM = R"rawliteral(
     padding: 30px 35px;
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-    width: 320px;
+    width: 340px;
     text-align: center;
+    transition: all 0.3s ease;
   }
   h1 {
     font-size: 20px;
@@ -235,7 +258,7 @@ const char htmlPage[] PROGMEM = R"rawliteral(
   }
   input {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     margin: 8px 0;
     border-radius: 6px;
     border: 1px solid #444;
@@ -243,57 +266,130 @@ const char htmlPage[] PROGMEM = R"rawliteral(
     color: #eee;
     box-sizing: border-box;
   }
+  input:focus {
+    outline: none;
+    border-color: #3a7bd5;
+  }
   input:disabled {
     opacity: 0.5;
   }
   button {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     margin-top: 10px;
     border: none;
     border-radius: 6px;
     background: #3a7bd5;
     color: white;
     font-weight: bold;
+    font-size: 15px;
     cursor: pointer;
+    transition: background 0.3s;
   }
+  button:hover { background: #2b5ca8; }
   button:disabled {
     background: #555;
     cursor: not-allowed;
   }
+  
+  /* Status Area Styles */
   #statusArea {
     margin-top: 18px;
     padding: 10px;
     border-radius: 6px;
     background: #1c1f26;
     font-size: 15px;
+    font-weight: bold;
   }
   #attemptsArea {
     margin-top: 10px;
     font-size: 13px;
     color: #bbb;
   }
+
+  /* Utility Class to Hide Elements */
+  .hidden { display: none !important; }
+
+  /* Success Dashboard Styles */
+  #successSection {
+    padding: 20px 0;
+  }
+  .success-icon {
+    font-size: 60px;
+    margin-bottom: 15px;
+    color: #4ade80;
+  }
+  
+  /* JSON Console Styles */
+  .json-wrapper {
+    margin-top: 25px;
+    text-align: left;
+    border-top: 1px solid #444;
+    padding-top: 15px;
+  }
+  .json-title {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .json-console {
+    background: #0d1117;
+    color: #a5d6ff;
+    padding: 15px;
+    border-radius: 6px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 1px solid #30363d;
+  }
 </style>
 </head>
 <body>
   <div class="card">
-    <h1>SMART ACCESS CONTROL SYSTEM</h1>
-    <input type="text" id="username" placeholder="Username" autocomplete="off">
-    <input type="password" id="password" placeholder="Password" autocomplete="off">
-    <button id="loginBtn" onclick="doLogin()">Login</button>
-    <div id="statusArea">&#128993; System Ready</div>
-    <div id="attemptsArea">Failed Attempts: 0 / 3</div>
+    
+    <!-- 1. LOGIN SECTION -->
+    <div id="loginSection">
+      <h1>SMART ACCESS CONTROL</h1>
+      <input type="text" id="username" placeholder="Username" autocomplete="off">
+      <input type="password" id="password" placeholder="Password" autocomplete="off">
+      <button id="loginBtn" onclick="doLogin()">Login</button>
+      <div id="statusArea" style="color: #eab308;">&#128993; System Ready</div>
+      <div id="attemptsArea">Failed Attempts: 0 / 3</div>
+    </div>
+
+    <!-- 2. SUCCESS SECTION (Hidden by default) -->
+    <div id="successSection" class="hidden">
+      <div class="success-icon">&#10004;&#65039;</div>
+      <h2 style="color: #4ade80; margin: 10px 0;">Access Granted</h2>
+      <p style="color: #bbb; font-size: 14px;">Welcome to the secure dashboard.</p>
+      <button onclick="window.location.href='/logout'" style="background: #444; margin-top: 20px;">&#128257; Logout / Reset</button>
+    </div>
+
+    <!-- 3. JSON RESPONSE CONSOLE (Hidden until first request) -->
+    <div id="jsonWrapper" class="json-wrapper hidden">
+      <div class="json-title">Server JSON Payload:</div>
+      <div id="jsonOutput" class="json-console"></div>
+    </div>
+
   </div>
 
 <script>
 function doLogin() {
   var user = document.getElementById('username').value.trim();
   var pass = document.getElementById('password').value.trim();
+  var statusArea = document.getElementById('statusArea');
 
   if (user === "" || pass === "") {
-    document.getElementById('statusArea').innerHTML = "&#9888; Please enter both username and password";
+    statusArea.innerHTML = "&#9888; Enter username & password";
+    statusArea.style.color = "#facc15";
     return;
   }
+
+  statusArea.innerHTML = "&#8987; Authenticating...";
+  statusArea.style.color = "#bbb";
 
   var url = "/login?username=" + encodeURIComponent(user) + "&password=" + encodeURIComponent(pass);
 
@@ -301,26 +397,43 @@ function doLogin() {
     .then(function(res) { return res.json(); })
     .then(function(data) { updateUI(data); })
     .catch(function(err) {
-      document.getElementById('statusArea').innerHTML = "&#9888; Connection error";
+      statusArea.innerHTML = "&#9888; Connection Error";
+      statusArea.style.color = "#ef4444";
     });
 }
 
 function updateUI(data) {
+  var loginSection = document.getElementById('loginSection');
+  var successSection = document.getElementById('successSection');
   var statusArea = document.getElementById('statusArea');
   var attemptsArea = document.getElementById('attemptsArea');
+  var jsonWrapper = document.getElementById('jsonWrapper');
+  var jsonOutput = document.getElementById('jsonOutput');
 
-  attemptsArea.innerHTML = "Failed Attempts: " + data.attempts + " / 3";
+  // Print Raw JSON to the UI 
+  jsonWrapper.classList.remove('hidden');
+  jsonOutput.textContent = JSON.stringify(data, null, 2);
 
-  if (data.locked) {
-    statusArea.innerHTML = "&#128274; SYSTEM LOCKED";
-    attemptsArea.innerHTML = "Failed Attempts: 3 / 3";
-    document.getElementById('username').disabled = true;
-    document.getElementById('password').disabled = true;
-    document.getElementById('loginBtn').disabled = true;
-  } else if (data.success) {
-    statusArea.innerHTML = "&#128994; Access Granted";
-  } else {
-    statusArea.innerHTML = "&#128308; Access Denied";
+  // Handle Logic based on JSON response
+  if (data.success) {
+    // Hide login, Show success dashboard
+    loginSection.classList.add('hidden');
+    successSection.classList.remove('hidden');
+  } 
+  else {
+    // Update attempts counter
+    attemptsArea.innerHTML = "Failed Attempts: " + data.attempts + " / 3";
+
+    if (data.locked) {
+      statusArea.innerHTML = "&#128274; SYSTEM LOCKED";
+      statusArea.style.color = "#ef4444";
+      document.getElementById('username').disabled = true;
+      document.getElementById('password').disabled = true;
+      document.getElementById('loginBtn').disabled = true;
+    } else {
+      statusArea.innerHTML = "&#128308; Access Denied";
+      statusArea.style.color = "#ef4444";
+    }
   }
 }
 </script>
@@ -348,31 +461,57 @@ const char lockedHtmlPage[] PROGMEM = R"rawliteral(
   }
   .card {
     background: #262b36;
-    padding: 40px 35px;
+    padding: 30px 35px;
     border-radius: 12px;
-    box-shadow: 0 8px 30px rgba(220, 53, 69, 0.3); /* රතු පැහැති shadow එකක් */
-    width: 320px;
+    box-shadow: 0 8px 30px rgba(239, 68, 68, 0.25);
+    width: 340px;
     text-align: center;
-    border: 2px solid #dc3545;
+    border: 1px solid #ef4444;
   }
   .icon {
-    font-size: 55px;
+    font-size: 60px;
     margin-bottom: 15px;
   }
   h1 {
-    font-size: 22px;
-    color: #dc3545;
-    margin-bottom: 10px;
+    font-size: 20px;
+    color: #ef4444;
+    margin-bottom: 15px;
     letter-spacing: 1px;
   }
   p {
     color: #bbb;
     font-size: 14px;
     line-height: 1.6;
+    margin: 8px 0;
   }
   .highlight {
     color: #fff;
     font-weight: bold;
+  }
+  
+  .json-wrapper {
+    margin-top: 25px;
+    text-align: left;
+    border-top: 1px solid #444;
+    padding-top: 15px;
+  }
+  .json-title {
+    font-size: 11px;
+    color: #8b949e;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .json-console {
+    background: #0d1117;
+    color: #a5d6ff;
+    padding: 15px;
+    border-radius: 6px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 1px solid #30363d;
   }
 </style>
 </head>
@@ -382,6 +521,19 @@ const char lockedHtmlPage[] PROGMEM = R"rawliteral(
     <h1>SYSTEM LOCKED</h1>
     <p>Maximum failed login attempts reached.</p>
     <p>Please <span class="highlight">Restart the ESP32</span> to restore access.</p>
+    
+    <!-- JSON RESPONSE CONSOLE -->
+    <div class="json-wrapper">
+      <div class="json-title">Server JSON Payload:</div>
+      <div class="json-console">{
+  "success": false,
+  "status": "SYSTEM_LOCKED",
+  "message": "System is locked. Restart ESP32 to reset",
+  "attempts": 3,
+  "locked": true
+}</div>
+    </div>
+
   </div>
 </body>
 </html>
@@ -392,16 +544,27 @@ void handleRootRequest(WiFiClient& client) {
   client.println("Content-Type: text/html");
   client.println("Connection: close");
   client.println();
-  client.print(htmlPage);
-}
-
-void handleLoginRequest(WiFiClient& client, String request) {
-  String json;
 
   if (IS_LOCKED) {
     client.print(lockedHtmlPage);
-    json = buildJsonResponse(false, "SYSTEM_LOCKED", "System is locked. Restart ESP32 to reset.", FAILED_ATTEMPTS, true);
+  } else {
+    client.print(htmlPage);
+  }
+}
 
+void handleLoginRequest(WiFiClient& client, String request) {
+
+  String json;
+  String clientIP = client.remoteIP().toString();
+  String logStatus, logMessage, logLocked;
+  int logAttempts = FAILED_ATTEMPTS;
+
+  if (IS_LOCKED) {
+    json = buildJsonResponse(false, "SYSTEM_LOCKED", "System is locked. Restart ESP32 to reset.", FAILED_ATTEMPTS, true);
+    logStatus = "SYSTEM_LOCKED";
+    logMessage = "Account is currently locked";
+    logLocked = "True";
+    Serial.println("System: SYSTEM LOCKED - Account is currently locked.");
   } else {
 
     String username = urlDecode(getValue(request, "username="));
@@ -414,21 +577,35 @@ void handleLoginRequest(WiFiClient& client, String request) {
       FAILED_ATTEMPTS = 0;
       setSuccessState();
       json = buildJsonResponse(true, "ACCESS_GRANTED", "Access Granted", 0, false);
+      logStatus = "ACCESS_GRANTED";
+      logAttempts = 0;
+      logMessage = "Successful login";
+      logLocked = "False";
+      Serial.println("System: ACCESS GRANTED - Login successful.");
 
     } else {
 
       // Failed Login
 
       FAILED_ATTEMPTS++;
+      logAttempts = FAILED_ATTEMPTS;
 
       if (FAILED_ATTEMPTS >= MAX_ATTEMPTS) {
         IS_LOCKED = true;
         setLockedState();
         json = buildJsonResponse(false, "SYSTEM_LOCKED", "Too many failed attempts. System locked.", FAILED_ATTEMPTS, true);
+        logStatus = "SYSTEM_LOCKED";
+        logMessage = "Max attempts reached";
+        logLocked = "True";
+        Serial.println("System: SYSTEM LOCKED - Too many failed attempts. System locked.");
 
       } else {
         setFailState(FAILED_ATTEMPTS);
         json = buildJsonResponse(false, "ACCESS_DENIED", "Access Denied", FAILED_ATTEMPTS, false);
+        logStatus = "ACCESS_DENIED";
+        logMessage = "Invalid credentials used";
+        logLocked = "False";
+        Serial.println("System: ACCESS DENIED - Invalid credentials used");
       }
     }
   }
@@ -438,8 +615,46 @@ void handleLoginRequest(WiFiClient& client, String request) {
   client.println("Connection: close");
   client.println();
   client.print(json);
+
+  client.stop();
+  sendLog(clientIP, logStatus, logAttempts, logMessage, logLocked);
 }
 
+void handleLogoutRequest(WiFiClient& client) {
+  String json;
+  String clientIP = client.remoteIP().toString();
+  String logStatus, logMessage, logLocked;
+  int logAttempts = FAILED_ATTEMPTS;
+
+
+  if (IS_LOCKED) {
+    json = buildJsonResponse(false, "SYSTEM_LOCKED", "System is locked. Restart ESP32 to reset.", FAILED_ATTEMPTS, true);
+    logStatus = "SYSTEM_LOCKED";
+    logMessage = "Account is currently locked";
+    logLocked = "True";
+    Serial.println("System: System is locked. Restart ESP32 to reset.");
+
+  } else {
+
+    FAILED_ATTEMPTS = 0;
+
+    setReadyState();
+    json = buildJsonResponse(true, "LOGOUT", "Secure logout successful", FAILED_ATTEMPTS, false);
+    logStatus = "LOGOUT";
+    logMessage = "Secure logout successful";
+    logLocked = "False";
+    Serial.println("System: LOGOUT - Secure logout successful");
+    Serial.println("System: Ready to proceed");
+  }
+
+  client.println("HTTP/1.1 302 Found");
+  client.println("Location: /");
+  client.println("Connection: close");
+  client.print(json);
+
+  client.stop();
+  sendLog(clientIP, logStatus, logAttempts, logMessage, logLocked);
+}
 
 void setup() {
 
@@ -480,7 +695,6 @@ void setup() {
 
   server.begin();
   Serial.println("HTTP server started on port 80");
-  
 }
 
 
@@ -498,6 +712,8 @@ void loop() {
 
     if (request.indexOf("GET /login") != -1) {
       handleLoginRequest(client, request);
+    } else if (request.indexOf("GET /logout") != -1) {
+      handleLogoutRequest(client);
     } else {
       handleRootRequest(client);
     }
